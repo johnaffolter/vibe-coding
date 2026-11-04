@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Citation Formatter</title>
+<style>
+  :root { --bg:#f6f4ef; --card:#fff; --ink:#1f1d1a; --muted:#6b675f; --line:#ddd8cc; --accent:#3c3489; --ok:#0f6e56; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#191816; --card:#24221f; --ink:#ece9e2; --muted:#a29e94; --line:#3a3732; --accent:#afa9ec; --ok:#5dcaa5; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:960px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:24px; margin:0 0 4px; } .sub { color:var(--muted); margin:0 0 20px; }
+  .grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  @media (max-width:760px) { .grid { grid-template-columns:1fr; } }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input, select { width:100%; padding:8px 10px; font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  .out { border-top:1px solid var(--line); padding:12px 0; }
+  .out:first-of-type { border-top:0; padding-top:0; }
+  .out h2 { font-size:14px; margin:0 0 6px; display:flex; justify-content:space-between; align-items:center; }
+  .cite { padding-left:2em; text-indent:-2em; font-family: Georgia, serif; min-height:1.5em; }
+  button { font:inherit; font-size:13px; padding:4px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--accent); cursor:pointer; }
+  button.done { color:var(--ok); }
+  .actions { display:flex; gap:8px; margin-top:14px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Citation formatter</h1>
+  <p class="sub">Fill in the fields once and get APA 7, MLA 9 and Chicago (author-date) side by side.</p>
+  <div class="grid">
+    <section class="card" aria-label="Source details">
+      <label for="type">Source type</label>
+      <select id="type">
+        <option value="article">Journal article</option>
+        <option value="book">Book</option>
+        <option value="web">Web page</option>
+      </select>
+      <label for="authors">Authors</label>
+      <input id="authors" placeholder="Smith, Jane; Doe, John A.">
+      <div class="hint">Last, First; separate authors with a semicolon.</div>
+      <label for="title">Title</label>
+      <input id="title" placeholder="Title of the work">
+      <div class="row">
+        <div><label for="year">Year</label><input id="year" inputmode="numeric" placeholder="2024"></div>
+        <div id="pubWrap"><label for="container">Journal / site</label><input id="container" placeholder="Journal of Examples"></div>
+      </div>
+      <div class="row" id="volRow">
+        <div><label for="volume">Volume</label><input id="volume"></div>
+        <div><label for="issue">Issue</label><input id="issue"></div>
+      </div>
+      <div class="row">
+        <div id="pagesWrap"><label for="pages">Pages</label><input id="pages" placeholder="12-34"></div>
+        <div id="publisherWrap"><label for="publisher">Publisher</label><input id="publisher"></div>
+      </div>
+      <label for="url">DOI or URL</label>
+      <input id="url" placeholder="10.1000/xyz123 or https://...">
+      <div id="accessWrap"><label for="accessed">Date accessed (web)</label><input id="accessed" type="date"></div>
+      <div class="actions"><button id="sample" type="button">Load sample</button><button id="clear" type="button">Clear</button></div>
+    </section>
+    <section class="card" aria-label="Formatted citations" aria-live="polite">
+      <div class="out"><h2>APA 7 <button data-k="apa">Copy</button></h2><div class="cite" id="apa"></div></div>
+      <div class="out"><h2>MLA 9 <button data-k="mla">Copy</button></h2><div class="cite" id="mla"></div></div>
+      <div class="out"><h2>Chicago author-date <button data-k="chi">Copy</button></h2><div class="cite" id="chi"></div></div>
+      <p class="hint">Always check against your style guide; capitalization of titles is left as you typed it.</p>
+    </section>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const F = ["type","authors","title","year","container","volume","issue","pages","publisher","url","accessed"];
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const it = s => s ? `<i>${esc(s)}</i>` : "";
+
+function parseAuthors(s) {
+  return s.split(";").map(a => a.trim()).filter(Boolean).map(a => {
+    const [last, first = ""] = a.split(",").map(x => x.trim());
+    return { last, first };
+  });
+}
+const initials = f => f.split(/[\s-]+/).filter(Boolean).map(n => n[0].toUpperCase() + ".").join(" ");
+const link = u => !u ? "" : /^10\./.test(u) ? "https://doi.org/" + u : u;
+const end = s => s && !/[.?!]$/.test(s) ? s + "." : s;
+
+function apa(d, A) {
+  let names = A.map(a => a.first ? `${a.last}, ${initials(a.first)}` : a.last);
+  let au = names.length <= 1 ? names.join("") : names.length === 2 ? names.join(", & ")
+         : names.slice(0, -1).join(", ") + ", & " + names.at(-1);
+  if (names.length > 20) au = names.slice(0, 19).join(", ") + ", . . . " + names.at(-1);
+  const yr = `(${d.year || "n.d."}).`;
+  let out = (au ? end(au) + " " : "");
+  if (d.type === "article") {
+    out += `${yr} ${end(esc(d.title))} ${it(d.container)}`;
+    if (d.volume) out += `, ${it(d.volume)}`;
+    if (d.issue) out += `(${esc(d.issue)})`;
+    if (d.pages) out += `, ${esc(d.pages.replace("-", "–"))}`;
+    out += ".";
+  } else if (d.type === "book") {
+    out += `${yr} ${end(it(d.title))}${d.publisher ? " " + end(esc(d.publisher)) : ""}`;
+  } else {
+    out += `${yr} ${end(it(d.title))}${d.container ? " " + end(esc(d.container)) : ""}`;
+  }
+  if (d.url) out += " " + esc(link(d.url));
+  return out;
+}
+
+function mla(d, A) {
+  let au = "";
+  if (A.length === 1) au = A[0].first ? `${A[0].last}, ${A[0].first}` : A[0].last;
+  else if (A.length === 2) au = `${A[0].last}, ${A[0].first}, and ${A[1].first} ${A[1].last}`.replace(/\s+/g, " ");
+  else if (A.length > 2) au = `${A[0].last}, ${A[0].first}, et al`;
+  let out = au ? end(au) + " " : "";
+  if (d.type === "book") {
+    out += `${end(it(d.title))} ${d.publisher ? esc(d.publisher) + ", " : ""}${esc(d.year)}.`;
+  } else {
+    out += `“${end(esc(d.title))}” ${it(d.container)}`;
+    const bits = [];
+    if (d.volume) bits.push("vol. " + esc(d.volume));
+    if (d.issue) bits.push("no. " + esc(d.issue));
+    if (d.year) bits.push(esc(d.year));
+    if (d.pages) bits.push("pp. " + esc(d.pages.replace("-", "–")));
+    if (bits.length) out += (d.container ? ", " : "") + bits.join(", ");
+    if (d.url) out += ", " + esc(link(d.url).replace(/^https?:\/\//, ""));
+    out += ".";
+    if (d.type === "web" && d.accessed) {
+      const dt = new Date(d.accessed + "T00:00");
+      out += ` Accessed ${dt.getDate()} ${dt.toLocaleString("en-US", { month: "short" })}. ${dt.getFullYear()}.`;
+    }
+  }
+  return out;
+}
+
+function chicago(d, A) {
+  let au = "";
+  if (A.length) {
+    const first = A[0].first ? `${A[0].last}, ${A[0].first}` : A[0].last;
+    const rest = A.slice(1).map(a => `${a.first} ${a.last}`.trim());
+    au = A.length === 1 ? first : A.length === 2 ? `${first}, and ${rest[0]}`
+       : `${first}, ${rest.slice(0, -1).join(", ")}, and ${rest.at(-1)}`;
+  }
+  let out = (au ? end(au) + " " : "") + `${d.year || "n.d."}. `;
+  if (d.type === "article") {
+    out += `“${end(esc(d.title))}” ${it(d.container)}`;
+    if (d.volume) out += ` ${esc(d.volume)}`;
+    if (d.issue) out += ` (${esc(d.issue)})`;
+    if (d.pages) out += `: ${esc(d.pages.replace("-", "–"))}`;
+    out += ".";
+  } else if (d.type === "book") {
+    out += `${end(it(d.title))}${d.publisher ? " " + end(esc(d.publisher)) : ""}`;
+  } else {
+    out += `“${end(esc(d.title))}”${d.container ? " " + end(esc(d.container)) : ""}`;
+  }
+  if (d.url) out += " " + esc(link(d.url)) + ".";
+  return out;
+}
+
+function render() {
+  const d = Object.fromEntries(F.map(k => [k, $(k).value.trim()]));
+  const t = d.type;
+  $("volRow").style.display = t === "article" ? "" : "none";
+  $("pagesWrap").style.display = t === "article" ? "" : "none";
+  $("publisherWrap").style.display = t === "book" ? "" : "none";
+  $("pubWrap").style.display = t === "book" ? "none" : "";
+  $("accessWrap").style.display = t === "web" ? "" : "none";
+  $("pubWrap").querySelector("label").textContent = t === "web" ? "Website name" : "Journal";
+  const A = parseAuthors(d.authors);
+  const empty = !d.title && !A.length;
+  $("apa").innerHTML = empty ? "" : apa(d, A);
+  $("mla").innerHTML = empty ? "" : mla(d, A);
+  $("chi").innerHTML = empty ? "" : chicago(d, A);
+  try { localStorage.setItem("citation-formatter", JSON.stringify(d)); } catch (e) {}
+}
+
+F.forEach(k => $(k).addEventListener("input", render));
+document.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", async () => {
+  const el = $(b.dataset.k);
+  try {
+    await navigator.clipboard.write([new ClipboardItem({
+      "text/html": new Blob([el.innerHTML], { type: "text/html" }),
+      "text/plain": new Blob([el.textContent], { type: "text/plain" }) })]);
+  } catch (e) { try { await navigator.clipboard.writeText(el.textContent); } catch (e2) {} }
+  b.textContent = "Copied"; b.classList.add("done");
+  setTimeout(() => { b.textContent = "Copy"; b.classList.remove("done"); }, 1200);
+}));
+$("sample").onclick = () => {
+  Object.assign(Object.fromEntries(F.map(k => [k, $(k)])), {});
+  const s = { type: "article", authors: "Smith, Jane; Doe, John A.", title: "An example study of example things",
+    year: "2024", container: "Journal of Examples", volume: "12", issue: "3", pages: "45-67", url: "10.1000/xyz123" };
+  F.forEach(k => $(k).value = s[k] || "");
+  render();
+};
+$("clear").onclick = () => { F.forEach(k => { if (k !== "type") $(k).value = ""; }); render(); };
+
+try {
+  const saved = JSON.parse(localStorage.getItem("citation-formatter") || "null");
+  if (saved) F.forEach(k => { if (saved[k] != null) $(k).value = saved[k]; });
+} catch (e) {}
+render();
+</script>
+</body>
+</html>

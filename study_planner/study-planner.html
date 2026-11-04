@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Study Session Planner</title>
+<style>
+  :root { --bg:#f4f6f5; --card:#fff; --ink:#1b201e; --muted:#66706b; --line:#d6ddd9; --accent:#0f6e56; --tint:#e1f5ee; --warn:#854f0b; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151918; --card:#1f2523; --ink:#e6ece9; --muted:#9aa5a0; --line:#34403b; --accent:#5dcaa5; --tint:#0f2f27; --warn:#ef9f27; } }
+  * { box-sizing:border-box; }
+  body { margin:0; font:16px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
+  main { max-width:900px; margin:0 auto; padding:24px 16px 48px; }
+  h1 { font-size:24px; margin:0 0 4px; } .sub { color:var(--muted); margin:0 0 20px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
+  input, textarea, select { width:100%; padding:8px 10px; font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; }
+  textarea { min-height:120px; resize:vertical; }
+  .row { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+  @media (max-width:640px) { .row { grid-template-columns:1fr; } }
+  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--card); cursor:pointer; }
+  button.ghost { background:transparent; color:var(--accent); }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
+  .err { color:var(--warn); font-size:14px; margin-top:8px; min-height:1em; }
+  .day { display:grid; grid-template-columns:120px 1fr; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
+  .day:first-child { border-top:0; }
+  .date { font-weight:600; } .date small { display:block; font-weight:400; color:var(--muted); }
+  .item { display:flex; gap:8px; align-items:center; padding:2px 0; }
+  .item input { width:auto; }
+  .pill { font-size:12px; padding:1px 8px; border-radius:99px; background:var(--tint); color:var(--accent); white-space:nowrap; }
+  .done span.t { text-decoration:line-through; color:var(--muted); }
+  .exam { color:var(--warn); font-weight:600; }
+  .progress { font-size:14px; color:var(--muted); }
+  @media print { .card.setup, .actions { display:none; } body { background:#fff; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Study session planner</h1>
+  <p class="sub">List your topics and a deadline; each topic is reviewed on a spaced schedule (first pass, then about 1, 3 and 7 days later), packed so no day goes over your limit.</p>
+
+  <section class="card setup">
+    <label for="topics">Topics, one per line</label>
+    <textarea id="topics" placeholder="Chapter 1: Research design&#10;Chapter 2: Sampling&#10;Chapter 3: Measurement"></textarea>
+    <div class="row">
+      <div><label for="start">Start date</label><input id="start" type="date"></div>
+      <div><label for="exam">Deadline / exam date</label><input id="exam" type="date"></div>
+      <div><label for="perDay">Max sessions per day</label><input id="perDay" type="number" min="1" max="12" value="3"></div>
+    </div>
+    <div class="actions">
+      <button id="build" type="button">Build plan</button>
+      <button id="sample" class="ghost" type="button">Load sample</button>
+    </div>
+    <div class="err" id="err" role="alert"></div>
+  </section>
+
+  <section class="card" id="planCard" hidden>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <strong>Your plan</strong><span class="progress" id="progress"></span>
+    </div>
+    <div id="plan"></div>
+    <div class="actions">
+      <button id="print" class="ghost" type="button">Print</button>
+      <button id="copy" class="ghost" type="button">Copy as text</button>
+    </div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const DAY = 864e5;
+const iso = d => d.toISOString().slice(0, 10);
+const parse = s => new Date(s + "T00:00:00Z");
+const fmt = d => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+const OFFSETS = [0, 1, 3, 7];
+const LABELS = ["Learn", "Review 1", "Review 2", "Review 3"];
+let state = { plan: null, done: {} };
+
+function save() { try { localStorage.setItem("study-planner", JSON.stringify({ ...state, topics: $("topics").value, start: $("start").value, exam: $("exam").value, perDay: $("perDay").value })); } catch (e) {} }
+
+function build() {
+  const topics = $("topics").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const perDay = Math.max(1, parseInt($("perDay").value) || 3);
+  const err = $("err");
+  if (!topics.length) return err.textContent = "Add at least one topic.";
+  if (!$("start").value || !$("exam").value) return err.textContent = "Pick a start date and a deadline.";
+  const start = parse($("start").value), exam = parse($("exam").value);
+  const days = Math.round((exam - start) / DAY);
+  if (days < 1) return err.textContent = "The deadline needs to be after the start date.";
+  err.textContent = "";
+
+  const load = Array(days).fill(0).map(() => []);
+  const firstPassWindow = Math.max(1, Math.floor(days * 0.6));
+  let warn = 0;
+  topics.forEach((t, i) => {
+    let base = Math.floor(i * firstPassWindow / topics.length);
+    OFFSETS.forEach((off, k) => {
+      let d = base + off;
+      if (d >= days) { if (k === 0) d = days - 1; else return; }
+      while (d < days && load[d].length >= perDay) d++;
+      if (d >= days) { warn++; return; }
+      load[d].push({ topic: t, step: LABELS[k] });
+      if (k === 0) base = d;
+    });
+  });
+  for (let d = days - 1, n = 0; d >= 0 && n < 1; d--, n++) if (load[d].length < perDay) load[d].push({ topic: "Mixed practice across all topics", step: "Final" });
+
+  state.plan = load.map((items, i) => ({ date: iso(new Date(start.getTime() + i * DAY)), items }));
+  state.plan.push({ date: iso(exam), items: [], exam: true });
+  state.done = {};
+  if (warn) err.textContent = `${warn} review session(s) didn't fit before the deadline. Try raising the daily limit or starting earlier.`;
+  render(); save();
+}
+
+function render() {
+  if (!state.plan) return;
+  $("planCard").hidden = false;
+  const box = $("plan"); box.innerHTML = "";
+  let total = 0, done = 0;
+  state.plan.forEach((day, di) => {
+    if (!day.items.length && !day.exam) return;
+    const row = document.createElement("div"); row.className = "day";
+    const dt = document.createElement("div"); dt.className = "date";
+    dt.innerHTML = fmt(parse(day.date)) + (day.exam ? '<small class="exam">Deadline</small>' : `<small>${day.items.length} session${day.items.length > 1 ? "s" : ""}</small>`);
+    const list = document.createElement("div");
+    day.items.forEach((it, ii) => {
+      const key = di + "-" + ii; total++; if (state.done[key]) done++;
+      const lab = document.createElement("label"); lab.className = "item" + (state.done[key] ? " done" : "");
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!state.done[key];
+      cb.onchange = () => { state.done[key] = cb.checked; render(); save(); };
+      const t = document.createElement("span"); t.className = "t"; t.textContent = it.topic;
+      const p = document.createElement("span"); p.className = "pill"; p.textContent = it.step;
+      lab.append(cb, t, p); list.append(lab);
+    });
+    if (day.exam) list.innerHTML = '<span class="exam">You’re ready.</span>';
+    row.append(dt, list); box.append(row);
+  });
+  $("progress").textContent = `${done} of ${total} sessions done`;
+}
+
+$("build").onclick = build;
+$("sample").onclick = () => {
+  $("topics").value = "Research design\nSampling methods\nMeasurement & validity\nRegression basics\nQualitative coding\nEthics & IRB";
+  const t = new Date(); t.setUTCHours(0,0,0,0);
+  $("start").value = iso(t); $("exam").value = iso(new Date(t.getTime() + 14 * DAY));
+  build();
+};
+$("print").onclick = () => print();
+$("copy").onclick = async () => {
+  const txt = state.plan.filter(d => d.items.length || d.exam).map(d => fmt(parse(d.date)) + (d.exam ? " — DEADLINE" : "\n" + d.items.map(i => `  [ ] ${i.topic} (${i.step})`).join("\n"))).join("\n");
+  try { await navigator.clipboard.writeText(txt); $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy as text", 1200); } catch (e) {}
+};
+["topics","start","exam","perDay"].forEach(id => $(id).addEventListener("input", () => { $("err").textContent = ""; }));
+
+try {
+  const s = JSON.parse(localStorage.getItem("study-planner") || "null");
+  if (s) { $("topics").value = s.topics || ""; $("start").value = s.start || ""; $("exam").value = s.exam || ""; $("perDay").value = s.perDay || 3; state.plan = s.plan; state.done = s.done || {}; render(); }
+} catch (e) {}
+if (!$("start").value) { const t = new Date(); t.setUTCHours(0,0,0,0); $("start").value = iso(t); }
+</script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Brain Dump Timer</title>
+<style>
+  :root { --bg:#faf7f2; --ink:#2a2622; --muted:#7a736a; --line:#e2dbd0; --accent:#993c1d; --bar:#d85a30; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#171513; --ink:#ebe5dc; --muted:#a39b90; --line:#36312b; --accent:#f0997b; --bar:#d85a30; } }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; font:18px/1.6 Georgia, serif; background:var(--bg); color:var(--ink); display:flex; flex-direction:column; }
+  header { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 16px; border-bottom:1px solid var(--line); font:14px/1.4 system-ui, sans-serif; }
+  header h1 { font-size:16px; margin:0 auto 0 0; }
+  select, button { font:inherit; padding:6px 12px; border-radius:8px; border:1px solid var(--line); background:transparent; color:var(--ink); cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:var(--bg); }
+  #clock { font-variant-numeric:tabular-nums; font-size:20px; min-width:64px; text-align:right; }
+  .bar { height:4px; background:var(--line); } .bar i { display:block; height:100%; width:0; background:var(--bar); transition:width .3s linear; }
+  textarea { flex:1; width:100%; max-width:760px; margin:0 auto; padding:32px 16px; border:0; outline:0; resize:none; background:transparent; color:var(--ink); font:inherit; transition:opacity 4s ease, filter 4s ease; }
+  textarea.fading { opacity:0; filter:blur(4px); }
+  #msg { text-align:center; font:14px system-ui, sans-serif; color:var(--muted); padding:8px 16px 16px; min-height:1.4em; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Brain dump timer</h1>
+    <label for="mins" style="color:var(--muted)">Length</label>
+    <select id="mins"><option>3</option><option selected>5</option><option>10</option><option>15</option></select>
+    <label style="color:var(--muted);display:flex;gap:6px;align-items:center"><input type="checkbox" id="keep"> Save before fading</label>
+    <span id="clock">5:00</span>
+    <button id="go" class="primary">Start</button>
+  </header>
+  <div class="bar"><i id="fill"></i></div>
+  <textarea id="pad" placeholder="Press Start, then write whatever is in your head. Don't edit, don't stop. When time runs out, it fades away so you can start fresh." aria-label="Free-write area"></textarea>
+  <div id="msg" aria-live="polite"></div>
+<script>
+const $ = id => document.getElementById(id);
+let total = 300, left = 300, t = null, running = false;
+const show = s => $("clock").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+
+function reset() {
+  clearInterval(t); running = false;
+  total = left = +$("mins").value * 60; show(left);
+  $("fill").style.width = "0"; $("go").textContent = "Start"; document.title = "Brain Dump Timer";
+}
+function tick() {
+  left--; show(left);
+  document.title = $("clock").textContent + " · Brain dump";
+  $("fill").style.width = (100 * (total - left) / total) + "%";
+  if (left <= 0) finish();
+}
+function finish() {
+  clearInterval(t); running = false;
+  const text = $("pad").value.trim();
+  if ($("keep").checked && text) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
+    a.download = "brain-dump-" + new Date().toISOString().slice(0, 16).replace(":", "") + ".txt";
+    a.click(); URL.revokeObjectURL(a.href);
+  }
+  $("pad").classList.add("fading");
+  $("msg").textContent = $("keep").checked && text ? "Saved a copy. Letting it go…" : "Time. Letting it go…";
+  setTimeout(() => {
+    $("pad").value = ""; $("pad").classList.remove("fading");
+    $("msg").textContent = "Clear head. Start again whenever you like.";
+    reset();
+  }, 4000);
+}
+$("go").onclick = () => {
+  if (running) { clearInterval(t); running = false; $("go").textContent = "Resume"; return; }
+  running = true; $("go").textContent = "Pause"; $("msg").textContent = ""; $("pad").focus();
+  t = setInterval(tick, 1000);
+};
+$("mins").onchange = () => { if (!running) reset(); };
+try { $("keep").checked = localStorage.getItem("brain-dump-keep") === "1"; } catch (e) {}
+$("keep").onchange = () => { try { localStorage.setItem("brain-dump-keep", $("keep").checked ? "1" : "0"); } catch (e) {} };
+reset();
+</script>
+</body>
+</html>
