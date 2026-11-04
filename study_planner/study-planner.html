@@ -5,46 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Study Session Planner</title>
 <style>
-  :root { --bg:#f4f6f5; --card:#fff; --ink:#1b201e; --muted:#66706b; --line:#d6ddd9; --accent:#0f6e56; --tint:#e1f5ee; --warn:#854f0b; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#151918; --card:#1f2523; --ink:#e6ece9; --muted:#9aa5a0; --line:#34403b; --accent:#5dcaa5; --tint:#0f2f27; --warn:#ef9f27; } }
+  :root { --bg:#f4f6f5; --card:#fff; --ink:#1b201e; --muted:#66706b; --line:#d6ddd9; --accent:#0f6e56; --tint:#e1f5ee; --warn:#854f0b; --warnTint:#faeeda; --hard:#993c1d; --hardTint:#faece7; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#151918; --card:#1f2523; --ink:#e6ece9; --muted:#9aa5a0; --line:#34403b; --accent:#5dcaa5; --tint:#0f2f27; --warn:#ef9f27; --warnTint:#33260f; --hard:#f0997b; --hardTint:#3a1f15; } }
   * { box-sizing:border-box; }
+  [hidden] { display:none !important; }
   body { margin:0; font:16px/1.5 system-ui, sans-serif; background:var(--bg); color:var(--ink); }
   main { max-width:900px; margin:0 auto; padding:24px 16px 48px; }
   h1 { font-size:24px; margin:0 0 4px; } .sub { color:var(--muted); margin:0 0 20px; }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px; }
   label { display:block; font-size:13px; color:var(--muted); margin:10px 0 4px; }
   input, textarea, select { width:100%; padding:8px 10px; font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; }
-  textarea { min-height:120px; resize:vertical; }
-  .row { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
-  @media (max-width:640px) { .row { grid-template-columns:1fr; } }
-  button { font:inherit; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--card); cursor:pointer; }
+  textarea { min-height:130px; resize:vertical; }
+  .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  .row { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
+  @media (max-width:720px) { .row { grid-template-columns:1fr 1fr; } }
+  button { font:inherit; font-size:14px; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--card); cursor:pointer; }
   button.ghost { background:transparent; color:var(--accent); }
   .actions { display:flex; gap:10px; flex-wrap:wrap; margin-top:14px; }
   .err { color:var(--warn); font-size:14px; margin-top:8px; min-height:1em; }
-  .day { display:grid; grid-template-columns:120px 1fr; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
+  .stats { display:flex; gap:16px; flex-wrap:wrap; font-size:14px; color:var(--muted); }
+  .stats b { color:var(--ink); font-variant-numeric:tabular-nums; }
+  .bar { height:6px; background:var(--line); border-radius:3px; margin:10px 0 4px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--accent); width:0; }
+  .banner { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; background:var(--warnTint); color:var(--warn); border-radius:8px; padding:10px 12px; margin:12px 0 4px; font-size:14px; }
+  .banner button { border-color:var(--warn); background:var(--warn); color:var(--card); }
+  .day { display:grid; grid-template-columns:130px 1fr; gap:12px; padding:10px 0; border-top:1px solid var(--line); }
   .day:first-child { border-top:0; }
+  .day.today { background:linear-gradient(to right, var(--tint), transparent 60%); margin:0 -18px; padding-left:18px; padding-right:18px; }
   .date { font-weight:600; } .date small { display:block; font-weight:400; color:var(--muted); }
-  .item { display:flex; gap:8px; align-items:center; padding:2px 0; }
+  .item { display:flex; gap:8px; align-items:center; padding:2px 0; flex-wrap:wrap; }
   .item input { width:auto; }
   .pill { font-size:12px; padding:1px 8px; border-radius:99px; background:var(--tint); color:var(--accent); white-space:nowrap; }
+  .pill.hard { background:var(--hardTint); color:var(--hard); }
+  .pill.late { background:var(--warnTint); color:var(--warn); }
   .done span.t { text-decoration:line-through; color:var(--muted); }
   .exam { color:var(--warn); font-weight:600; }
-  .progress { font-size:14px; color:var(--muted); }
-  @media print { .card.setup, .actions { display:none; } body { background:#fff; } }
+  @media (max-width:520px) { .day { grid-template-columns:1fr; gap:4px; } }
 </style>
 </head>
 <body>
 <main>
   <h1>Study session planner</h1>
-  <p class="sub">List your topics and a deadline; each topic is reviewed on a spaced schedule (first pass, then about 1, 3 and 7 days later), packed so no day goes over your limit.</p>
+  <p class="sub">List topics and a deadline. Each topic gets a first pass, then spaced reviews about 1, 3 and 7 days later (hard topics get an extra early review and a late refresher), packed so no day goes over your limit. Export to your calendar, and reschedule anything you miss.</p>
 
-  <section class="card setup">
+  <section class="card">
     <label for="topics">Topics, one per line</label>
-    <textarea id="topics" placeholder="Chapter 1: Research design&#10;Chapter 2: Sampling&#10;Chapter 3: Measurement"></textarea>
+    <textarea id="topics" placeholder="Research design&#10;Sampling methods | hard&#10;Measurement | easy"></textarea>
+    <div class="hint">Add “| hard” or “| easy” after a topic to change how often it comes back. No tag means medium.</div>
     <div class="row">
       <div><label for="start">Start date</label><input id="start" type="date"></div>
       <div><label for="exam">Deadline / exam date</label><input id="exam" type="date"></div>
       <div><label for="perDay">Max sessions per day</label><input id="perDay" type="number" min="1" max="12" value="3"></div>
+      <div><label for="sessTime">Session start time</label><input id="sessTime" type="time" value="09:00"></div>
     </div>
     <div class="actions">
       <button id="build" type="button">Build plan</button>
@@ -55,11 +66,14 @@
 
   <section class="card" id="planCard" hidden>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <strong>Your plan</strong><span class="progress" id="progress"></span>
+      <strong>Your plan</strong>
+      <div class="stats"><span><b id="sDone">0</b> of <b id="sTotal">0</b> done</span><span><b id="sDays">0</b> days left</span><span><b id="sToday">0</b> today</span></div>
     </div>
+    <div class="bar"><i id="pbar"></i></div>
+    <div class="banner" id="missed" hidden><span id="missedTxt"></span><button id="resched" type="button">Reschedule from today</button></div>
     <div id="plan"></div>
     <div class="actions">
-      <button id="print" class="ghost" type="button">Print</button>
+      <button id="ics" class="ghost" type="button">Export to calendar (.ics)</button>
       <button id="copy" class="ghost" type="button">Copy as text</button>
     </div>
   </section>
@@ -70,91 +84,154 @@ const DAY = 864e5;
 const iso = d => d.toISOString().slice(0, 10);
 const parse = s => new Date(s + "T00:00:00Z");
 const fmt = d => d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
-const OFFSETS = [0, 1, 3, 7];
-const LABELS = ["Learn", "Review 1", "Review 2", "Review 3"];
-let state = { plan: null, done: {} };
+const todayISO = () => { const t = new Date(); return iso(new Date(Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()))); };
+const SCHED = { easy: [0, 2, 6], medium: [0, 1, 3, 7], hard: [0, 1, 2, 4, 8, 14] };
+const STEP = ["Learn", "Review 1", "Review 2", "Review 3", "Review 4", "Review 5"];
+let state = { plan: null };
 
-function save() { try { localStorage.setItem("study-planner", JSON.stringify({ ...state, topics: $("topics").value, start: $("start").value, exam: $("exam").value, perDay: $("perDay").value })); } catch (e) {} }
-
+function save() {
+  try { localStorage.setItem("study-planner-v2", JSON.stringify({ plan: state.plan, topics: $("topics").value, start: $("start").value, exam: $("exam").value, perDay: $("perDay").value, sessTime: $("sessTime").value })); } catch (e) {}
+}
+function parseTopics() {
+  return $("topics").value.split("\n").map(s => s.trim()).filter(Boolean).map(line => {
+    const [name, tag = ""] = line.split("|").map(x => x.trim());
+    const level = /hard/i.test(tag) ? "hard" : /easy/i.test(tag) ? "easy" : "medium";
+    return { name, level };
+  });
+}
+function place(load, perDay, d, item) {
+  while (d < load.length && load[d].length >= perDay) d++;
+  if (d >= load.length) return -1;
+  load[d].push(item); return d;
+}
 function build() {
-  const topics = $("topics").value.split("\n").map(s => s.trim()).filter(Boolean);
-  const perDay = Math.max(1, parseInt($("perDay").value) || 3);
-  const err = $("err");
+  const topics = parseTopics(), perDay = Math.max(1, parseInt($("perDay").value) || 3), err = $("err");
   if (!topics.length) return err.textContent = "Add at least one topic.";
   if (!$("start").value || !$("exam").value) return err.textContent = "Pick a start date and a deadline.";
-  const start = parse($("start").value), exam = parse($("exam").value);
-  const days = Math.round((exam - start) / DAY);
+  const start = parse($("start").value), exam = parse($("exam").value), days = Math.round((exam - start) / DAY);
   if (days < 1) return err.textContent = "The deadline needs to be after the start date.";
   err.textContent = "";
-
-  const load = Array(days).fill(0).map(() => []);
-  const firstPassWindow = Math.max(1, Math.floor(days * 0.6));
-  let warn = 0;
-  topics.forEach((t, i) => {
-    let base = Math.floor(i * firstPassWindow / topics.length);
-    OFFSETS.forEach((off, k) => {
+  const load = Array.from({ length: days }, () => []);
+  const window = Math.max(1, Math.floor(days * 0.55));
+  const order = [...topics].sort((a, b) => (b.level === "hard") - (a.level === "hard"));
+  let dropped = 0;
+  order.forEach((t, i) => {
+    let base = Math.floor(i * window / order.length);
+    SCHED[t.level].forEach((off, k) => {
       let d = base + off;
-      if (d >= days) { if (k === 0) d = days - 1; else return; }
-      while (d < days && load[d].length >= perDay) d++;
-      if (d >= days) { warn++; return; }
-      load[d].push({ topic: t, step: LABELS[k] });
-      if (k === 0) base = d;
+      if (d >= days) { if (k === 0) d = days - 1; else { dropped++; return; } }
+      const at = place(load, perDay, d, { topic: t.name, step: STEP[k], level: t.level, done: false });
+      if (at < 0) { dropped++; return; }
+      if (k === 0) base = at;
     });
   });
-  for (let d = days - 1, n = 0; d >= 0 && n < 1; d--, n++) if (load[d].length < perDay) load[d].push({ topic: "Mixed practice across all topics", step: "Final" });
-
+  const last = days - 1;
+  if (load[last].length < perDay) load[last].push({ topic: "Mixed practice across all topics", step: "Final", level: "medium", done: false });
   state.plan = load.map((items, i) => ({ date: iso(new Date(start.getTime() + i * DAY)), items }));
   state.plan.push({ date: iso(exam), items: [], exam: true });
-  state.done = {};
-  if (warn) err.textContent = `${warn} review session(s) didn't fit before the deadline. Try raising the daily limit or starting earlier.`;
+  if (dropped) err.textContent = `${dropped} review session(s) didn't fit before the deadline. Raise the daily limit or start earlier.`;
   render(); save();
 }
-
+function missedItems() {
+  const t = todayISO(), out = [];
+  state.plan.forEach(day => { if (!day.exam && day.date < t) day.items.forEach(it => { if (!it.done) out.push(it); }); });
+  return out;
+}
+function reschedule() {
+  const perDay = Math.max(1, parseInt($("perDay").value) || 3), t = todayISO();
+  const days = state.plan.filter(d => !d.exam && d.date >= t);
+  const missed = [];
+  state.plan.forEach(day => { if (!day.exam && day.date < t) day.items = day.items.filter(it => { if (it.done) return true; missed.push(it); return false; }); });
+  if (!days.length) { $("err").textContent = "The deadline has passed, so there are no days left to move sessions to."; return; }
+  let notFit = 0;
+  missed.forEach(it => {
+    let i = days.findIndex(d => d.items.length < perDay);
+    if (i < 0) { i = 0; notFit++; }
+    it.late = true; days[i].items.unshift(it);
+  });
+  $("err").textContent = notFit ? `${notFit} session(s) went over your daily limit because the remaining days are full.` : "";
+  render(); save();
+}
 function render() {
   if (!state.plan) return;
   $("planCard").hidden = false;
-  const box = $("plan"); box.innerHTML = "";
-  let total = 0, done = 0;
-  state.plan.forEach((day, di) => {
+  const box = $("plan"), t = todayISO(); box.innerHTML = "";
+  let total = 0, done = 0, today = 0;
+  state.plan.forEach(day => {
     if (!day.items.length && !day.exam) return;
-    const row = document.createElement("div"); row.className = "day";
+    const row = document.createElement("div"); row.className = "day" + (day.date === t ? " today" : "");
     const dt = document.createElement("div"); dt.className = "date";
-    dt.innerHTML = fmt(parse(day.date)) + (day.exam ? '<small class="exam">Deadline</small>' : `<small>${day.items.length} session${day.items.length > 1 ? "s" : ""}</small>`);
+    dt.innerHTML = (day.date === t ? "Today · " : "") + fmt(parse(day.date)) + (day.exam ? '<small class="exam">Deadline</small>' : `<small>${day.items.length} session${day.items.length > 1 ? "s" : ""}</small>`);
     const list = document.createElement("div");
-    day.items.forEach((it, ii) => {
-      const key = di + "-" + ii; total++; if (state.done[key]) done++;
-      const lab = document.createElement("label"); lab.className = "item" + (state.done[key] ? " done" : "");
-      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!state.done[key];
-      cb.onchange = () => { state.done[key] = cb.checked; render(); save(); };
-      const t = document.createElement("span"); t.className = "t"; t.textContent = it.topic;
-      const p = document.createElement("span"); p.className = "pill"; p.textContent = it.step;
-      lab.append(cb, t, p); list.append(lab);
+    day.items.forEach(it => {
+      total++; if (it.done) done++; if (day.date === t && !it.done) today++;
+      const lab = document.createElement("label"); lab.className = "item" + (it.done ? " done" : "");
+      const cb = document.createElement("input"); cb.type = "checkbox"; cb.checked = !!it.done;
+      cb.onchange = () => { it.done = cb.checked; render(); save(); };
+      const tx = document.createElement("span"); tx.className = "t"; tx.textContent = it.topic;
+      const p = document.createElement("span"); p.className = "pill" + (it.level === "hard" ? " hard" : ""); p.textContent = it.step + (it.level === "hard" ? " · hard" : it.level === "easy" ? " · easy" : "");
+      lab.append(cb, tx, p);
+      if (it.late) { const l = document.createElement("span"); l.className = "pill late"; l.textContent = "moved"; lab.append(l); }
+      list.append(lab);
     });
-    if (day.exam) list.innerHTML = '<span class="exam">You’re ready.</span>';
+    if (day.exam) list.innerHTML = '<span class="exam">Deadline</span>';
     row.append(dt, list); box.append(row);
   });
-  $("progress").textContent = `${done} of ${total} sessions done`;
+  const examDay = state.plan.at(-1).date;
+  $("sDone").textContent = done; $("sTotal").textContent = total; $("sToday").textContent = today;
+  $("sDays").textContent = Math.max(0, Math.round((parse(examDay) - parse(t)) / DAY));
+  $("pbar").style.width = total ? (100 * done / total) + "%" : "0";
+  const m = missedItems();
+  $("missed").hidden = !m.length;
+  $("missedTxt").textContent = `${m.length} session${m.length > 1 ? "s" : ""} from earlier days ${m.length > 1 ? "are" : "is"} not checked off.`;
+}
+function icsEscape(s) { return s.replace(/[\\;,]/g, c => "\\" + c).replace(/\n/g, "\\n"); }
+function exportIcs() {
+  const [hh, mm] = ($("sessTime").value || "09:00").split(":").map(Number);
+  const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z";
+  const L = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//vibe-coding//study-planner//EN", "CALSCALE:GREGORIAN"];
+  let n = 0;
+  state.plan.forEach(day => {
+    const ymd = day.date.replace(/-/g, "");
+    if (day.exam) {
+      L.push("BEGIN:VEVENT", `UID:deadline-${ymd}@study-planner`, `DTSTAMP:${stamp}`, `DTSTART;VALUE=DATE:${ymd}`, "SUMMARY:Deadline / exam", "END:VEVENT");
+      return;
+    }
+    day.items.forEach((it, i) => {
+      const startMin = hh * 60 + mm + i * 60, endMin = startMin + 45;
+      const t = m => String(Math.floor(m / 60) % 24).padStart(2, "0") + String(m % 60).padStart(2, "0") + "00";
+      L.push("BEGIN:VEVENT", `UID:${ymd}-${i}-${n++}@study-planner`, `DTSTAMP:${stamp}`,
+        `DTSTART:${ymd}T${t(startMin)}`, `DTEND:${ymd}T${t(endMin)}`,
+        `SUMMARY:${icsEscape(it.step + ": " + it.topic)}`, `DESCRIPTION:${icsEscape("Study planner session (" + it.level + ")")}`, "END:VEVENT");
+    });
+  });
+  L.push("END:VCALENDAR");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([L.join("\r\n") + "\r\n"], { type: "text/calendar" }));
+  a.download = "study-plan.ics"; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
 $("build").onclick = build;
 $("sample").onclick = () => {
-  $("topics").value = "Research design\nSampling methods\nMeasurement & validity\nRegression basics\nQualitative coding\nEthics & IRB";
-  const t = new Date(); t.setUTCHours(0,0,0,0);
-  $("start").value = iso(t); $("exam").value = iso(new Date(t.getTime() + 14 * DAY));
+  $("topics").value = "Research design\nSampling methods | hard\nMeasurement & validity\nRegression basics | hard\nQualitative coding\nEthics & IRB | easy";
+  const t = todayISO(); $("start").value = t; $("exam").value = iso(new Date(parse(t).getTime() + 16 * DAY));
   build();
 };
-$("print").onclick = () => print();
+$("resched").onclick = reschedule;
+$("ics").onclick = exportIcs;
 $("copy").onclick = async () => {
-  const txt = state.plan.filter(d => d.items.length || d.exam).map(d => fmt(parse(d.date)) + (d.exam ? " — DEADLINE" : "\n" + d.items.map(i => `  [ ] ${i.topic} (${i.step})`).join("\n"))).join("\n");
+  const txt = state.plan.filter(d => d.items.length || d.exam).map(d => fmt(parse(d.date)) + (d.exam ? " — DEADLINE" : "\n" + d.items.map(i => `  [${i.done ? "x" : " "}] ${i.topic} (${i.step})`).join("\n"))).join("\n");
   try { await navigator.clipboard.writeText(txt); $("copy").textContent = "Copied"; setTimeout(() => $("copy").textContent = "Copy as text", 1200); } catch (e) {}
 };
-["topics","start","exam","perDay"].forEach(id => $(id).addEventListener("input", () => { $("err").textContent = ""; }));
+["topics", "start", "exam", "perDay"].forEach(id => $(id).addEventListener("input", () => { $("err").textContent = ""; }));
+$("sessTime").addEventListener("change", save);
 
 try {
-  const s = JSON.parse(localStorage.getItem("study-planner") || "null");
-  if (s) { $("topics").value = s.topics || ""; $("start").value = s.start || ""; $("exam").value = s.exam || ""; $("perDay").value = s.perDay || 3; state.plan = s.plan; state.done = s.done || {}; render(); }
+  const s = JSON.parse(localStorage.getItem("study-planner-v2") || "null");
+  if (s) { $("topics").value = s.topics || ""; $("start").value = s.start || ""; $("exam").value = s.exam || ""; $("perDay").value = s.perDay || 3; $("sessTime").value = s.sessTime || "09:00"; state.plan = s.plan; render(); }
 } catch (e) {}
-if (!$("start").value) { const t = new Date(); t.setUTCHours(0,0,0,0); $("start").value = iso(t); }
+if (!$("start").value) $("start").value = todayISO();
 </script>
 </body>
 </html>
