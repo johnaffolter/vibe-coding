@@ -1,8 +1,8 @@
-## Overview
-
 ## Week 8 submission (John Affolter)
 
 See [WEEK8.md](WEEK8.md) for the three apps, how they were built, and links to each `prompts.md`.
+
+## Overview
 
 This repository includes some example "apps" that were vibe coded, and intended to be used as demonstration for SEIS 606: Vibe Coding and/or for personal use.
 
