@@ -17,6 +17,7 @@
   input, textarea, select { width:100%; padding:8px 10px; font:inherit; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; }
   textarea { min-height:130px; resize:vertical; }
   .hint { font-size:12px; color:var(--muted); margin-top:4px; }
+  kbd { font:11px ui-monospace, Menlo, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 4px; }
   .row { display:grid; grid-template-columns:repeat(4, 1fr); gap:12px; }
   @media (max-width:720px) { .row { grid-template-columns:1fr 1fr; } }
   button { font:inherit; font-size:14px; padding:8px 14px; border-radius:8px; border:1px solid var(--accent); background:var(--accent); color:var(--card); cursor:pointer; }
@@ -39,6 +40,11 @@
   .pill.late { background:var(--warnTint); color:var(--warn); }
   .done span.t { text-decoration:line-through; color:var(--muted); }
   .exam { color:var(--warn); font-weight:600; }
+  .topics { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px 16px; margin:14px 0 6px; font-size:13px; }
+  .topics div { min-width:0; } .topics .nm { display:flex; justify-content:space-between; gap:6px; }
+  .topics .nm span:first-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .topics .mini { height:4px; background:var(--line); border-radius:2px; overflow:hidden; margin-top:3px; } .topics .mini i { display:block; height:100%; background:var(--accent); }
+  .toggle { font-size:13px; color:var(--muted); display:flex; gap:6px; align-items:center; margin:0; } .toggle input { width:auto; }
   @media (max-width:520px) { .day { grid-template-columns:1fr; gap:4px; } }
 </style>
 </head>
@@ -50,7 +56,7 @@
   <section class="card">
     <label for="topics">Topics, one per line</label>
     <textarea id="topics" placeholder="Research design&#10;Sampling methods | hard&#10;Measurement | easy"></textarea>
-    <div class="hint">Add “| hard” or “| easy” after a topic to change how often it comes back. No tag means medium.</div>
+    <div class="hint">Add “| hard” or “| easy” after a topic to change how often it comes back. No tag means medium. <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd> builds the plan.</div>
     <div class="row">
       <div><label for="start">Start date</label><input id="start" type="date"></div>
       <div><label for="exam">Deadline / exam date</label><input id="exam" type="date"></div>
@@ -67,10 +73,12 @@
   <section class="card" id="planCard" hidden>
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <strong>Your plan</strong>
+      <label class="toggle"><input type="checkbox" id="hideDone"> Hide finished days</label>
       <div class="stats"><span><b id="sDone">0</b> of <b id="sTotal">0</b> done</span><span><b id="sDays">0</b> days left</span><span><b id="sToday">0</b> today</span></div>
     </div>
     <div class="bar"><i id="pbar"></i></div>
     <div class="banner" id="missed" hidden><span id="missedTxt"></span><button id="resched" type="button">Reschedule from today</button></div>
+    <div class="topics" id="topicProg"></div>
     <div id="plan"></div>
     <div class="actions">
       <button id="ics" class="ghost" type="button">Export to calendar (.ics)</button>
@@ -157,8 +165,19 @@ function render() {
   $("planCard").hidden = false;
   const box = $("plan"), t = todayISO(); box.innerHTML = "";
   let total = 0, done = 0, today = 0;
+  const per = {};
+  state.plan.forEach(day => day.items.forEach(it => { if (it.step === "Final") return; const p = per[it.topic] ||= { done: 0, total: 0, level: it.level }; p.total++; if (it.done) p.done++; }));
+  const tp = $("topicProg"); tp.innerHTML = "";
+  Object.entries(per).forEach(([name, p]) => {
+    const d = document.createElement("div");
+    d.innerHTML = `<div class="nm"><span></span><span>${p.done}/${p.total}</span></div><div class="mini"><i style="width:${100 * p.done / p.total}%"></i></div>`;
+    d.querySelector(".nm span").textContent = name + (p.level === "hard" ? " (hard)" : p.level === "easy" ? " (easy)" : "");
+    d.title = name; tp.append(d);
+  });
+  const hideDone = $("hideDone").checked;
   state.plan.forEach(day => {
     if (!day.items.length && !day.exam) return;
+    if (hideDone && !day.exam && day.items.every(i => i.done) && day.date !== t) { day.items.forEach(i => { total++; done++; }); return; }
     const row = document.createElement("div"); row.className = "day" + (day.date === t ? " today" : "");
     const dt = document.createElement("div"); dt.className = "date";
     dt.innerHTML = (day.date === t ? "Today · " : "") + fmt(parse(day.date)) + (day.exam ? '<small class="exam">Deadline</small>' : `<small>${day.items.length} session${day.items.length > 1 ? "s" : ""}</small>`);
@@ -219,6 +238,9 @@ $("sample").onclick = () => {
   build();
 };
 $("resched").onclick = reschedule;
+$("hideDone").onchange = () => { render(); try { localStorage.setItem("study-planner-hide", $("hideDone").checked ? "1" : "0"); } catch (e) {} };
+try { $("hideDone").checked = localStorage.getItem("study-planner-hide") === "1"; } catch (e) {}
+$("topics").addEventListener("keydown", e => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); build(); } });
 $("ics").onclick = exportIcs;
 $("copy").onclick = async () => {
   const txt = state.plan.filter(d => d.items.length || d.exam).map(d => fmt(parse(d.date)) + (d.exam ? " — DEADLINE" : "\n" + d.items.map(i => `  [${i.done ? "x" : " "}] ${i.topic} (${i.step})`).join("\n"))).join("\n");

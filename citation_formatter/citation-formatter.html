@@ -38,6 +38,10 @@
   ol#lib li:first-child { border-top:0; }
   .empty { color:var(--muted); font-size:14px; padding:8px 0; }
   details { margin-top:12px; } summary { cursor:pointer; color:var(--accent); font-size:14px; }
+  .intext { display:grid; grid-template-columns:auto 1fr auto; gap:6px 12px; align-items:center; font-size:14px; }
+  .intext span.k { color:var(--muted); font-size:12px; } .intext code { font-family:Georgia, serif; font-size:15px; }
+  kbd { font:12px ui-monospace, Menlo, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 4px; }
+  .dup { color:var(--warn); font-size:12px; }
 </style>
 </head>
 <body>
@@ -91,7 +95,10 @@
       <div class="out"><h3>APA 7 <button data-k="apa">Copy</button></h3><div class="cite" id="apa"></div></div>
       <div class="out"><h3>MLA 9 <button data-k="mla">Copy</button></h3><div class="cite" id="mla"></div></div>
       <div class="out"><h3>Chicago author-date <button data-k="chi">Copy</button></h3><div class="cite" id="chi"></div></div>
-      <p class="hint">Check against your style guide; title capitalization is kept as entered.</p>
+      <div class="out"><h3>In-text citations</h3>
+        <div class="intext" id="intext"></div>
+      </div>
+      <p class="hint">Check against your style guide; title capitalization is kept as entered. Shortcuts: <kbd>/</kbd> jumps to DOI lookup, <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>Enter</kbd> adds to the list.</p>
     </section>
   </div>
 
@@ -199,6 +206,18 @@ function chicago(d, A) {
   return out;
 }
 const FMT = { apa, mla, chi: chicago };
+function inText(d, A) {
+  const L = A.map(a => a.last), y = d.year || "n.d.";
+  const pg = (d.pages || "").split(/[-–]/)[0];
+  const apaN = !L.length ? `“${(d.title || "Untitled").split(/\s+/).slice(0, 4).join(" ")}”` : L.length === 1 ? L[0] : L.length === 2 ? `${L[0]} & ${L[1]}` : `${L[0]} et al.`;
+  const mlaN = !L.length ? `“${(d.title || "Untitled").split(/\s+/).slice(0, 4).join(" ")}”` : L.length === 1 ? L[0] : L.length === 2 ? `${L[0]} and ${L[1]}` : `${L[0]} et al.`;
+  const chiN = !L.length ? mlaN : L.length <= 3 ? (L.length === 1 ? L[0] : L.slice(0, -1).join(", ") + " and " + L.at(-1)) : `${L[0]} et al.`;
+  return [
+    ["APA", `(${apaN}, ${y})`, `${apaN.replace(" & ", " and ")} (${y})`],
+    ["MLA", `(${mlaN}${pg ? " " + pg : ""})`, ""],
+    ["Chicago", `(${chiN} ${y}${pg ? ", " + pg : ""})`, ""],
+  ];
+}
 const current = () => Object.fromEntries(F.map(k => [k, $(k).value.trim()]));
 
 function render() {
@@ -211,6 +230,15 @@ function render() {
   $("pubWrap").querySelector("label").textContent = t === "web" ? "Website name" : "Journal";
   const A = parseAuthors(d.authors), empty = !d.title && !A.length;
   for (const k in FMT) $(k).innerHTML = empty ? "" : FMT[k](d, A);
+  const box = $("intext"); box.innerHTML = "";
+  if (!empty) inText(d, A).forEach(([style, paren, narr]) => {
+    const k = document.createElement("span"); k.className = "k"; k.textContent = style;
+    const c = document.createElement("code"); c.textContent = paren + (narr ? "   ·   " + narr : "");
+    const b = document.createElement("button"); b.textContent = "Copy"; b.onclick = () => copyText(b, paren);
+    box.append(k, c, b);
+  });
+  const dupe = lib.some(x => sameRef(x, d));
+  $("save").title = dupe ? "This source is already in your list" : "";
   try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) {}
 }
 function fill(d) { F.forEach(k => $(k).value = d[k] || (k === "type" ? "article" : "")); render(); }
@@ -243,6 +271,8 @@ async function lookup() {
 }
 
 /* ---- Reference list ---- */
+const norm = s => (s || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+const sameRef = (a, b) => (norm(a.url) && norm(a.url) === norm(b.url)) || (norm(a.title) && norm(a.title) === norm(b.title) && (a.year || "") === (b.year || ""));
 function saveLib() { try { localStorage.setItem(LIB, JSON.stringify(lib)); } catch (e) {} }
 const sortKey = d => ((parseAuthors(d.authors)[0]?.last || d.title || "") + " " + d.year).toLowerCase();
 function renderLib() {
@@ -334,11 +364,16 @@ function download(name, text, mime) {
 /* ---- wiring ---- */
 F.forEach(k => $(k).addEventListener("input", render));
 $("lookup").onclick = lookup;
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) { e.preventDefault(); $("doiLookup").focus(); }
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("save").click(); }
+});
 $("doiLookup").addEventListener("keydown", e => { if (e.key === "Enter") lookup(); });
 document.querySelectorAll("[data-k]").forEach(b => b.addEventListener("click", () => { const el = $(b.dataset.k); copyText(b, el.textContent, el.innerHTML); }));
 $("save").onclick = () => {
   const d = current();
   if (!d.title && !d.authors) { $("lookupStatus").className = "status err"; $("lookupStatus").textContent = "Add at least a title or an author before saving."; return; }
+  if (lib.some(x => sameRef(x, d))) { $("lookupStatus").className = "status err"; $("lookupStatus").textContent = "That source is already in your reference list."; return; }
   lib.push(d); saveLib(); renderLib();
   $("save").textContent = "Added"; setTimeout(() => $("save").textContent = "Add to reference list", 1200);
 };
@@ -359,8 +394,10 @@ $("importBtn").onclick = () => {
   const txt = $("importBox").value, st = $("importStatus");
   const items = /^\s*@/m.test(txt) ? parseBibtex(txt) : /^TY\s{2}-/m.test(txt) ? parseRis(txt) : [];
   if (!items.length) { st.className = "status err"; st.textContent = "No BibTeX (@article{…}) or RIS (TY  - …) entries found."; return; }
-  lib.push(...items); saveLib(); renderLib();
-  st.className = "status ok"; st.textContent = `Imported ${items.length} reference${items.length > 1 ? "s" : ""}.`; $("importBox").value = "";
+  const fresh = items.filter(it => !lib.some(x => sameRef(x, it)));
+  lib.push(...fresh); saveLib(); renderLib();
+  const skipped = items.length - fresh.length;
+  st.className = "status ok"; st.textContent = `Imported ${fresh.length} reference${fresh.length === 1 ? "" : "s"}` + (skipped ? `, skipped ${skipped} already in your list.` : "."); $("importBox").value = "";
 };
 
 try {

@@ -51,3 +51,27 @@ I upgraded [brain-dump-timer.html](brain-dump-timer.html) in place (git history 
 - **Clear history** needs a second click to confirm, and the panel can be hidden.
 
 Testing (headless Chromium): a 15-word session was saved to history at time-up, the text faded and cleared, the Markdown export had the right heading, length and text, and history survived a reload. No console errors.
+
+# Prompt 3 (keep improving):
+
+> - **Tool:** Claude · Opus 5.5 · 2026-11-04
+> - **Session:** continued · attached: none
+> - **Verified:** agent-tested
+> - **Human edits:** none
+
+My messages, exactly as typed (two in a row):
+
+keep improving it please
+
+please contiue this way more
+
+I didn't name specific features, so Claude chose the round-3 changes itself.
+
+## Output 3:
+
+Third pass on [brain-dump-timer.html](brain-dump-timer.html):
+
+- **Search history:** a search box filters past sessions and highlights the match in context, so old ideas are easy to find again.
+- **Shortcuts:** Ctrl/⌘+Enter starts or pauses, and Esc pauses.
+
+Testing (headless Chromium): Ctrl+Enter started the timer and Esc paused it; searching "irb" found and highlighted the right session, and a search with no hits showed "No sessions match that search." No horizontal scrolling at 390px phone width, no console errors.

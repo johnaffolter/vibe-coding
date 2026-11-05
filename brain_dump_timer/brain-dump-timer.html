@@ -35,6 +35,10 @@
   aside li button { font-size:12px; padding:2px 8px; margin-right:4px; }
   aside .foot { display:flex; gap:8px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--line); }
   .empty { padding:14px; color:var(--muted); }
+  .search { padding:8px 14px; border-bottom:1px solid var(--line); }
+  .search input { width:100%; font:inherit; padding:6px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg); color:var(--ink); }
+  mark { background:#fac775; color:#412402; border-radius:2px; }
+  kbd { font:11px ui-monospace, Menlo, monospace; border:1px solid var(--line); border-bottom-width:2px; border-radius:4px; padding:0 4px; }
   @media (max-width:760px) { .stage { flex-direction:column; } aside { width:auto; border-left:0; border-top:1px solid var(--line); max-height:45vh; } }
 </style>
 </head>
@@ -51,13 +55,14 @@
   <div class="bar"><i id="fill"></i></div>
   <div class="stage">
     <div class="write">
-      <textarea id="pad" placeholder="Press Start, then write whatever is in your head. Don't edit, don't stop. When time runs out it fades away so you can start fresh. A copy goes to your history unless you untick “Keep in history”." aria-label="Free-write area"></textarea>
+      <textarea id="pad" placeholder="Press Start (or Ctrl/⌘+Enter), then write whatever is in your head. Don't edit, don't stop. Esc pauses. When time runs out it fades away so you can start fresh. A copy goes to your history unless you untick “Keep in history”." aria-label="Free-write area"></textarea>
       <div class="live"><span><b id="wc">0</b> words</span><span><b id="wpm">0</b> words/min</span></div>
       <div id="msg" aria-live="polite"></div>
     </div>
     <aside id="hist" aria-label="Session history">
       <div class="head"><strong>History</strong><span class="muted" id="hCount"></span></div>
       <div class="totals" id="totals"></div>
+      <div class="search"><input id="q" type="search" placeholder="Search your brain dumps" aria-label="Search history"></div>
       <ol id="hList"></ol>
       <div class="foot">
         <button id="exportMd">Export all as Markdown</button>
@@ -114,10 +119,18 @@ function renderHist() {
   let streak = 0; for (let d = new Date(); ; d.setDate(d.getDate() - 1)) { const k = new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); if (days.has(k)) streak++; else break; }
   $("totals").textContent = history.length ? `${tw.toLocaleString()} words · ${tm} min written · ${streak}-day streak` : "Finished sessions show up here.";
   if (!history.length) { ol.innerHTML = '<li class="empty">No sessions yet.</li>'; return; }
-  history.forEach((h, i) => {
+  const q = ($("q").value || "").trim().toLowerCase();
+  const shown = history.map((h, i) => ({ h, i })).filter(({ h }) => !q || h.text.toLowerCase().includes(q));
+  if (!shown.length) { ol.innerHTML = '<li class="empty">No sessions match that search.</li>'; return; }
+  shown.forEach(({ h, i }) => {
     const li = document.createElement("li");
     li.innerHTML = `<div class="meta"><span>${fmtDate(h.at)}</span><span>${h.words} words · ${h.minutes} min</span></div>`;
-    const p = document.createElement("p"); p.textContent = h.text; li.append(p);
+    const p = document.createElement("p");
+    if (q) { const at = h.text.toLowerCase().indexOf(q), from = Math.max(0, at - 40);
+      const pre = (from ? "…" : "") + h.text.slice(from, at), hit = h.text.slice(at, at + q.length), post = h.text.slice(at + q.length);
+      p.append(pre); const m = document.createElement("mark"); m.textContent = hit; p.append(m, post);
+    } else p.textContent = h.text;
+    li.append(p);
     const cp = document.createElement("button"); cp.textContent = "Copy";
     cp.onclick = async () => { try { await navigator.clipboard.writeText(h.text); cp.textContent = "Copied"; setTimeout(() => cp.textContent = "Copy", 1200); } catch (e) {} };
     const rm = document.createElement("button"); rm.textContent = "Delete";
@@ -141,6 +154,11 @@ $("go").onclick = () => {
   t = setInterval(tick, 1000);
 };
 $("pad").addEventListener("input", updateLive);
+$("q").addEventListener("input", renderHist);
+document.addEventListener("keydown", e => {
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); $("go").click(); }
+  else if (e.key === "Escape" && running) { $("go").click(); }
+});
 $("mins").onchange = () => { if (!running) reset(); };
 $("histBtn").onclick = () => { const h = $("hist"); h.hidden = !h.hidden; $("histBtn").setAttribute("aria-expanded", !h.hidden); try { localStorage.setItem("brain-dump-hist-open", h.hidden ? "0" : "1"); } catch (e) {} };
 $("exportMd").onclick = exportMd;
