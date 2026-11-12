@@ -2,6 +2,10 @@
 
 See [WEEK8.md](WEEK8.md) for the three apps, how they were built, and links to each `prompts.md`.
 
+## Projects and prompts as data
+
+[ELEMENTS.md](ELEMENTS.md) describes every project and prompt as records with keys, a grain and fixed vocabularies, and `node tools/check-prompts.js` checks them against CONVENTIONS.md.
+
 ## Overview
 
 This repository includes some example "apps" that were vibe coded, and intended to be used as demonstration for SEIS 606: Vibe Coding and/or for personal use.

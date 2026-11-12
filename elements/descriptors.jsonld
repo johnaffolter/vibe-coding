@@ -1,0 +1,310 @@
+{
+ "@context": {
+  "@vocab": "https://superintelligence-homepage.example/ns#",
+  "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+  "label": "rdfs:label",
+  "description": "rdfs:comment",
+  "id": "@id",
+  "relationships": {
+   "@container": "@list"
+  }
+ },
+ "@graph": [
+  {
+   "id": "collection:vibe-project",
+   "kind": "collection",
+   "label": "Vibe-coding project",
+   "owner": "vibe-coding",
+   "source": "CONVENTIONS.md (project header)",
+   "aliases": [
+    "vibe project",
+    "project header"
+   ],
+   "description": "One project folder in a vibe-coding repo: something built with an AI assistant, with its prompts.md header saying what it is, how it went and whether it was worth it.",
+   "tags": [
+    "interop:external",
+    "repo:vibe-coding",
+    "storage:markdown"
+   ],
+   "properties": {
+    "folder": {
+     "type": "string",
+     "description": "The project's folder name (snake_case); its natural key.",
+     "required": true,
+     "pattern": "^[a-z0-9_]+$"
+    },
+    "title": {
+     "type": "string",
+     "description": "The name after '# Project:'.",
+     "required": true
+    },
+    "files": {
+     "type": "json",
+     "description": "The deliverable files in the folder."
+    },
+    "date_first": {
+     "type": "date",
+     "description": "First prompt date."
+    },
+    "date_last": {
+     "type": "date",
+     "description": "Last prompt date."
+    },
+    "defaults": {
+     "type": "string",
+     "description": "Tool and model used unless a prompt says otherwise."
+    },
+    "status": {
+     "type": "string",
+     "description": "prototype, keeper or abandoned (TBD while unknown).",
+     "required": true,
+     "enum": [
+      "prototype",
+      "keeper",
+      "abandoned",
+      "TBD"
+     ]
+    },
+    "use": {
+     "type": "string",
+     "description": "Where it was actually used, or none yet."
+    },
+    "reusability_artifact": {
+     "type": "string",
+     "description": "Is the thing worth reusing?",
+     "enum": [
+      "low",
+      "medium",
+      "high",
+      "TBD"
+     ]
+    },
+    "reusability_prompt": {
+     "type": "string",
+     "description": "Is the technique worth copying?",
+     "enum": [
+      "low",
+      "medium",
+      "high",
+      "TBD"
+     ]
+    },
+    "tags": {
+     "type": "json",
+     "description": "Tags from the conventions' tag list."
+    },
+    "takeaway": {
+     "type": "string",
+     "description": "One sentence, written while fresh."
+    },
+    "story_value": {
+     "type": "string",
+     "description": "none, anecdote, case study or chapter-worthy.",
+     "enum": [
+      "none",
+      "anecdote",
+      "case study",
+      "chapter-worthy",
+      "TBD"
+     ]
+    },
+    "surprises": {
+     "type": "string",
+     "description": "Failures and pleasant surprises."
+    }
+   },
+   "keys": {
+    "surrogate": null,
+    "primary": [
+     "folder"
+    ],
+    "natural": [
+     [
+      "folder"
+     ]
+    ]
+   },
+   "grain": {
+    "statement": "one row per project folder",
+    "keys": [
+     "folder"
+    ]
+   },
+   "relationships": [
+    {
+     "rel": "has-prompt",
+     "target": "collection:vibe-prompt",
+     "direction": "in",
+     "cardinality": "1..*",
+     "description": "Its prompts, in order."
+    }
+   ],
+   "constraints": [
+    {
+     "id": "tags-from-vocabulary",
+     "kind": "vocabulary",
+     "on": "tags",
+     "value": [
+      "single-file-html",
+      "classroom-tool",
+      "teaching-example",
+      "game",
+      "data-viz",
+      "presentation",
+      "productivity",
+      "print-pdf",
+      "audio",
+      "drag-drop",
+      "canvas",
+      "physics",
+      "localStorage",
+      "export-import",
+      "theming",
+      "source-material",
+      "brainstorm",
+      "site"
+     ],
+     "message": "Tags come from the list in CONVENTIONS.md; add a new one there first."
+    },
+    {
+     "id": "no-missing-fields",
+     "kind": "required-or-TBD",
+     "on": [
+      "status",
+      "takeaway",
+      "story_value"
+     ],
+     "message": "Write TBD rather than leaving a field out."
+    }
+   ],
+   "lifecycle": {
+    "persistence": "perpetual",
+    "retention": "git history"
+   },
+   "series": {
+    "time": "date_last",
+    "cadence": "per project",
+    "order": "desc"
+   },
+   "@id": "urn:si:element:collection:vibe-project",
+   "@type": "Element"
+  },
+  {
+   "id": "collection:vibe-prompt",
+   "kind": "collection",
+   "label": "Vibe-coding prompt",
+   "owner": "vibe-coding",
+   "source": "CONVENTIONS.md (prompt context block)",
+   "aliases": [
+    "prompt section",
+    "prompt context block"
+   ],
+   "description": "One prompt in a project's prompts.md, with its context block: the tool and date, the session, how long it took, how well its result was verified and what a person changed afterward.",
+   "tags": [
+    "interop:external",
+    "repo:vibe-coding",
+    "storage:markdown"
+   ],
+   "properties": {
+    "project": {
+     "type": "string",
+     "description": "The project folder this prompt belongs to.",
+     "required": true
+    },
+    "number": {
+     "type": "integer",
+     "required": true,
+     "min": 1,
+     "description": "Its number in the file (Prompt 1, 2, ...)."
+    },
+    "purpose": {
+     "type": "string",
+     "description": "What the prompt is for (the words in brackets)."
+    },
+    "tool": {
+     "type": "string",
+     "description": "Tool, model and date; required by the conventions.",
+     "required": true
+    },
+    "date": {
+     "type": "date",
+     "description": "The date from the Tool line."
+    },
+    "session": {
+     "type": "string",
+     "description": "fresh or continued, and attached files."
+    },
+    "time_seconds": {
+     "type": "integer",
+     "min": 0,
+     "unit": "s",
+     "description": "How long the assistant worked."
+    },
+    "verified": {
+     "type": "string",
+     "description": "not-run, syntax-checked, agent-tested or human-tested; required by the conventions.",
+     "required": true,
+     "enum": [
+      "not-run",
+      "syntax-checked",
+      "agent-tested",
+      "human-tested"
+     ]
+    },
+    "human_edits": {
+     "type": "string",
+     "description": "What a person changed afterward, or none; required by the conventions.",
+     "required": true
+    },
+    "has_output": {
+     "type": "boolean",
+     "description": "Whether its Output section is there."
+    }
+   },
+   "keys": {
+    "surrogate": null,
+    "primary": [
+     "project",
+     "number"
+    ],
+    "natural": [
+     [
+      "project",
+      "number"
+     ]
+    ]
+   },
+   "grain": {
+    "statement": "one row per prompt per project",
+    "keys": [
+     "project",
+     "number"
+    ]
+   },
+   "relationships": [
+    {
+     "rel": "project",
+     "target": "collection:vibe-project",
+     "direction": "out",
+     "via": "project",
+     "cardinality": "1",
+     "inverse": "has-prompt"
+    }
+   ],
+   "lifecycle": {
+    "persistence": "perpetual",
+    "retention": "git history"
+   },
+   "series": {
+    "time": "date",
+    "cadence": "event",
+    "order": "asc",
+    "partition": [
+     "project"
+    ]
+   },
+   "@id": "urn:si:element:collection:vibe-prompt",
+   "@type": "Element"
+  }
+ ]
+}
