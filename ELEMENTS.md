@@ -27,6 +27,17 @@ No dependencies: `tools/si-elements/` is a vendored copy of the descriptor libra
 Homepage repository (`packages/si-elements`), and `tools/vibe-elements.js` is the reader it shares with that site's
 element catalog. `elements/shapes.ttl` is standard SHACL, so any SHACL validator can check `records.nq`.
 
+## Example output
+
+```text
+$ node tools/check-prompts.js
+collection:vibe-project: 7 rows, 0 problem(s)
+collection:vibe-prompt: 26 rows, 54 problem(s)
+  - palette_picker prompt 1: collection:vibe-prompt.tool is empty
+  ...
+  - palette_picker prompt 3: collection:vibe-prompt: primary key (project, number) repeats rows 9 and 10
+```
+
 ## What the first run found
 
 - `palette_picker/prompts.md` has two sections headed `# Prompt 3`, so prompt numbers aren't unique there.
